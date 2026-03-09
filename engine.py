@@ -703,19 +703,28 @@ class BackroomsEngine:
         if not self._has_moved and self.is_moving:
             self._has_moved = True
 
-        # Check if player crossed into a new seed cell
+        # Check if player crossed into a new seed cell.
+        # Deadzone: require the player to be at least 30 units past the boundary
+        # before confirming a crossing — prevents floating-point ping-pong.
+        _CROSS_DEADZONE = 30.0
         new_col = int(self.x // ZONE_SIZE)
         new_row = int(self.z // ZONE_SIZE)
         if self._has_moved and (new_col != self.map_col or new_row != self.map_row):
-            new_seed = min(9223372033963249499, max(0, new_col + new_row * 3_037_000_499))
-            self.world_seed = new_seed
-            self.map_col = new_col
-            self.map_row = new_row
-            self.wall_cache.clear()
-            self.zone_cache.clear()
-            self.pre_damaged_walls.clear()
-            # Keep destroyed_walls so player destruction persists across border
-            print(f"[seed] crossed to {new_seed} at cell ({new_col}, {new_row})")
+            # How far past the boundary are we?
+            local_x = self.x - new_col * ZONE_SIZE
+            local_z = self.z - new_row * ZONE_SIZE
+            past_boundary = min(local_x, local_z,
+                                ZONE_SIZE - local_x, ZONE_SIZE - local_z)
+            if past_boundary >= _CROSS_DEADZONE:
+                new_seed = min(9223372033963249499, max(0, new_col + new_row * 3_037_000_499))
+                self.world_seed = new_seed
+                self.map_col = new_col
+                self.map_row = new_row
+                self.wall_cache.clear()
+                self.zone_cache.clear()
+                self.pre_damaged_walls.clear()
+                # Keep destroyed_walls so player destruction persists across border
+                print(f"[seed] crossed to {new_seed} at cell ({new_col}, {new_row})")
 
         if self.is_moving:
             self.head_bob_time += dt * HEAD_BOB_SPEED
